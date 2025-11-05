@@ -50,7 +50,5 @@ for word in keywords:
 if articles:
     print(articles[0])
 else:
-    print("None")
-
-"testing"
+    print("None.")
 
