@@ -1,2 +1,1 @@
-#cleans data from headlines and kalshi
-
+#Joins headlines and kalshi data and cleans it
