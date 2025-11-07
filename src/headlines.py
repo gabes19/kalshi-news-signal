@@ -12,23 +12,29 @@ gnews_api_key = os.getenv("GNEWS_API_KEY")
 pipe = pipeline("text-classification", model="tabularisai/multilingual-sentiment-analysis")
 
 #Keywords related to inflation used to identify relevant articles
-keywords = ["cpi", "inflation", "consumer price", "pce", "price index", "ppi",
-            "cost of living", "price pressure", "rate hike", "monetary policy",
-            "fed", "federal reserve", "interest rate", "disinflation", "deflation"]
+keywords = ["cpi", "inflation", "consumer price", "pce", "price index", "ppi", "rate hike", "monetary policy",
+            "fed", "federal reserve", "interest rate", "deflation"]
 
-#TODO: do for gnews
-def get_headlines(sources:list[str],keywords:list[str],from_date:str,to_date:str)->list[str]:
-    keywords_string = ",".join(keywords)
-    print(keywords_string)
-    sources_string = ",".join(sources)
-    print(sources_string)
-    response = api.get_everything(qintitle=keywords_string,sources=sources_string, from_param=from_date, to=to_date, language="en")
-    headlines = []
-    for article in response["articles"]:
-        headlines.append(article["title"])
-    return headlines
-                  
-                  
+#Headline LEVEL DATA
+#Headline level: Date published, id, title, description, sentiment, source name, title + description sentiment
+
+
+def get_headlines(keywords:list[str],from_date:str,to_date:str)->list[str]:
+  keywords_string = " OR ".join(keywords)
+  params = {"in": "title,description", "from": from_date, "to": to_date, "lang" : "en", "q":keywords_string,
+              "country":"us", "max":100, "apikey":gnews_api_key}
+  response = requests.get("https://gnews.io/api/v4/search", params=params)
+  data = response.json()
+  headlines = {}
+  for article in data['articles']:
+      headlines['date'] = article['publishedAt']
+      headlines['id'] = article['id']
+      headlines['title'] = article['title']
+      headlines['description'] = article['description']
+      headlines['source'] = article['source']['name']
+  return headlines
+
+print(get_headlines(keywords=keywords,from_date="2025-10-01T00:00:00.000Z",to_date="2025-11-05T00:00:00.000Z"))
                   
 
 
