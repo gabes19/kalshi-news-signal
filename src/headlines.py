@@ -34,7 +34,16 @@ def get_headlines(keywords:list[str],from_date:str,to_date:str)->list[str]:
       headlines['source'] = article['source']['name']
   return headlines
 
-print(get_headlines(keywords=keywords,from_date="2025-10-01T00:00:00.000Z",to_date="2025-11-05T00:00:00.000Z"))
-                  
+def get_sentiment(text:str):
+   map = {"Very Negative": 0, "Negative":0.25, "Neutral":0.5, "Positive":0.75, "Very Positive": 1}
+   result = pipe(text)[0]['label']
+   sentiment_number = map.get(result)
+   return sentiment_number
+
+
+# print(get_headlines(keywords=keywords,from_date="2025-10-01T00:00:00.000Z",to_date="2025-11-05T00:00:00.000Z"))
+print(get_sentiment('Fed’s Paulson Backs Two More 2025 Rate Cuts Despite Tariffs Federal Reserve Bank of Philadelphia President Anna Paulson signaled she favors two more quarter-point interest-rate cuts this year, as monetary policy should look through the impact of tariffs in consumer price increases.'))
+
+
 
 
