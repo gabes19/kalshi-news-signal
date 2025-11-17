@@ -1,3 +1,6 @@
+# Data
+*.csv
+
 # OS / Editor
 .DS_Store
 Thumbs.db
