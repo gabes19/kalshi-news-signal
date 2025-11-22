@@ -1,4 +1,5 @@
 import pandas as pd
+import re
 #Calculates DAILY LEVEL DATA: date, daily article totals, avg sentiment, kalshi market data
 
 
@@ -31,6 +32,22 @@ def aggregate_daily_headlines(output_file:str):
     return daily_headlines
 
 
+#Helper function to extract probability thresholds from kalshi data (arg: list of dataframe columns)
+def extract_thresholds(columns:list[str]) -> list[float]:
+    thresholds = []
+    for c in columns:
+        #remove the % so appending float works
+        c = c.replace('%',"")
+        for t in c.split():
+            try:
+                thresholds.append(float(t))
+            except:
+                ValueError
+                pass
+    return thresholds
+        
+    
+
 #Creates some features based on kalshi data before exploration
 #Joins cpi, cpi_yoy, and cpi_core kalshi market data to headline data
 #date, market, headline data
@@ -43,6 +60,8 @@ def join_kalshi_data():
         for month in months:
             df = pd.read_csv(f'data/{market}/kalshi-price-history-25{month}-day')
             df['timestamp'] = df['timestamp'].astype(str).str.split('T').str[0]
+            columns = list(df.columns)
+            thresholds = extract_thresholds(columns)
             #TODO: Extract column names as thresholds
             #TODO: Calculate expected_cpi (market-implied mean)
             #TODO: Calculate daily CPI volatility (std = implied vol)
@@ -53,5 +72,6 @@ def join_kalshi_data():
             #TODO: Calculate spread between thresholds
             df = df.rename(columns={'timestamp':'date'})
 
-
-aggregate_daily_headlines('data/headlines/daily_headlines.csv')
+print(extract_thresholds(['timestamp','Above -0.1%','Above 0.0%',
+                    'Above 0.1%','Above 0.2%', 'Above 0.3%', 'Above 0.4%', 'Above 0.5%']))
+#aggregate_daily_headlines('data/headlines/daily_headlines.csv')
