@@ -62,7 +62,6 @@ def join_kalshi_data():
             df['timestamp'] = df['timestamp'].astype(str).str.split('T').str[0]
             columns = list(df.columns)
             thresholds = extract_thresholds(columns)
-            #TODO: Extract column names as thresholds
             #TODO: Calculate expected_cpi (market-implied mean)
             #TODO: Calculate daily CPI volatility (std = implied vol)
             #TODO: Calculate rolling prob volatility (std) for each threshold
