@@ -33,19 +33,25 @@ def aggregate_daily_headlines(output_file:str):
 
 
 #Helper function to extract probability thresholds from kalshi data (arg: list of dataframe columns)
-def extract_thresholds(columns:list[str]) -> list[float]:
-    thresholds = []
+#TODO: modify to return dict with key as column name and value as threshold
+def extract_thresholds(columns:list[str]) -> dict[str,float]:
+    thresholds_dict = {}
     for c in columns:
         #remove the % so appending float works
-        c = c.replace('%',"")
-        for t in c.split():
+        s = c.replace('%',"")
+        for t in s.split():
             try:
-                thresholds.append(float(t))
+                thresholds_dict[c] =float(t)
             except:
                 ValueError
                 pass
-    return thresholds
-        
+    return thresholds_dict
+
+#TODO:
+def calculate_expected_cpi():
+    pass
+
+
     
 
 #Creates some features based on kalshi data before exploration
@@ -61,6 +67,7 @@ def join_kalshi_data():
             df = pd.read_csv(f'data/{market}/kalshi-price-history-25{month}-day')
             df['timestamp'] = df['timestamp'].astype(str).str.split('T').str[0]
             columns = list(df.columns)
+            #TODO: Transform into dict to map column names and thresholds
             thresholds = extract_thresholds(columns)
             #TODO: Calculate expected_cpi (market-implied mean)
             #TODO: Calculate daily CPI volatility (std = implied vol)
@@ -71,6 +78,5 @@ def join_kalshi_data():
             #TODO: Calculate spread between thresholds
             df = df.rename(columns={'timestamp':'date'})
 
-print(extract_thresholds(['timestamp','Above -0.1%','Above 0.0%',
-                    'Above 0.1%','Above 0.2%', 'Above 0.3%', 'Above 0.4%', 'Above 0.5%']))
+print(extract_thresholds(['timestamp','Above -0.1%','Above 0.0%','Above 0.1%','Above 0.2%', 'Above 0.3%', 'Above 0.4%', 'Above 0.5%']))
 #aggregate_daily_headlines('data/headlines/daily_headlines.csv')
