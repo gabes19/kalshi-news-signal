@@ -1,7 +1,39 @@
 import pandas as pd
-import re
+import numpy as np
 #Calculates DAILY LEVEL DATA: date, daily article totals, avg sentiment, kalshi market data
-
+test_cols = ['timestamp','Above -0.1%','Above 0.0%','Above 0.1%','Above 0.2%', 'Above 0.3%', 'Above 0.4%', 'Above 0.5%']
+test_df = pd.DataFrame([
+    {
+        "timestamp": "2025-04-01T00:00:00Z",
+        "Above -0.1%": 99,
+        "Above 0.0%": 97,
+        "Above 0.1%": 88,
+        "Above 0.2%": 62,
+        "Above 0.3%": 28,
+        "Above 0.4%": 11,
+        "Above 0.5%": 3
+    },
+    {
+        "timestamp": "2025-04-02T00:00:00Z",
+        "Above -0.1%": 99,
+        "Above 0.0%": 96,
+        "Above 0.1%": 82,
+        "Above 0.2%": 55,
+        "Above 0.3%": 21,
+        "Above 0.4%": 8,
+        "Above 0.5%": 2
+    },
+    {
+        "timestamp": "2025-04-03T00:00:00Z",
+        "Above -0.1%": 99,
+        "Above 0.0%": 94,
+        "Above 0.1%": 79,
+        "Above 0.2%": 51,
+        "Above 0.3%": 20,
+        "Above 0.4%": 7,
+        "Above 0.5%": 2
+    }
+])
 
 #Aggregate daily article count, mean sentiment, median sentiment, variance, % pos/neg, min/max sentiment
 def aggregate_daily_headlines(output_file:str):
@@ -33,7 +65,6 @@ def aggregate_daily_headlines(output_file:str):
 
 
 #Helper function to extract probability thresholds from kalshi data (arg: list of dataframe columns)
-#TODO: modify to return dict with key as column name and value as threshold
 def extract_thresholds(columns:list[str]) -> dict[str,float]:
     thresholds_dict = {}
     for c in columns:
@@ -47,9 +78,21 @@ def extract_thresholds(columns:list[str]) -> dict[str,float]:
                 pass
     return thresholds_dict
 
-#TODO:
-def calculate_expected_cpi():
-    pass
+#Calculates and adds expected cpi column to dataframe
+def calculate_expected_cpi(thresholds:dict,df:pd.DataFrame)-> pd.DataFrame:
+    prob_cols = list(thresholds.keys())
+    probs = df[prob_cols].to_numpy() / 100.0
+    deltas = np.diff(list(thresholds.values()))
+    #all deltas are the same
+    if len(deltas) > 0 and np.allclose(deltas, deltas[0]):
+        delta = deltas[0]
+        df['expected_cpi'] = probs.sum(axis=1) * delta
+        return df
+    #non-uniform spacing (different deltas) so pad the last delta
+    deltas_full = np.append(deltas,deltas[-1])
+    df['expected_cpi'] = (probs * deltas_full).sum(axis = 1)
+    return df
+
 
 
     
@@ -67,9 +110,8 @@ def join_kalshi_data():
             df = pd.read_csv(f'data/{market}/kalshi-price-history-25{month}-day')
             df['timestamp'] = df['timestamp'].astype(str).str.split('T').str[0]
             columns = list(df.columns)
-            #TODO: Transform into dict to map column names and thresholds
             thresholds = extract_thresholds(columns)
-            #TODO: Calculate expected_cpi (market-implied mean)
+            df = calculate_expected_cpi(thresholds,df)
             #TODO: Calculate daily CPI volatility (std = implied vol)
             #TODO: Calculate rolling prob volatility (std) for each threshold
             #TODO: Calculate rolling total change for each threshold
@@ -78,5 +120,6 @@ def join_kalshi_data():
             #TODO: Calculate spread between thresholds
             df = df.rename(columns={'timestamp':'date'})
 
-print(extract_thresholds(['timestamp','Above -0.1%','Above 0.0%','Above 0.1%','Above 0.2%', 'Above 0.3%', 'Above 0.4%', 'Above 0.5%']))
+print(calculate_expected_cpi(extract_thresholds(test_cols),test_df))
+#print(extract_thresholds(test_cols))
 #aggregate_daily_headlines('data/headlines/daily_headlines.csv')
