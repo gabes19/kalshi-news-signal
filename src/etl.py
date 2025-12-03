@@ -78,6 +78,7 @@ def extract_thresholds(columns:list[str]) -> dict[str,float]:
                 pass
     return thresholds_dict
 
+
 #Calculates and adds expected cpi column to dataframe
 def calculate_expected_cpi(thresholds:dict,df:pd.DataFrame)-> pd.DataFrame:
     prob_cols = list(thresholds.keys())
@@ -93,7 +94,27 @@ def calculate_expected_cpi(thresholds:dict,df:pd.DataFrame)-> pd.DataFrame:
     df['expected_cpi'] = (probs * deltas_full).sum(axis = 1)
     return df
 
-
+#TODO: Test this function
+#Calculates and adds imolied volatility to dataframe
+def calculate_implied_volatility(thresholds:dict, df:pd.DataFrame) -> pd.DataFrame:
+    prob_cols = list(thresholds.keys())
+    probs = df[prob_cols].to_numpy() / 100.0
+    #assume equal deltas
+    deltas = np.diff(list(thresholds.values()))
+    if len(deltas) == 0:
+        df['implied_volatility'] = 0.0
+        return df
+    delta = deltas[0]
+    #E[X] ≈ sum_k S(t_k) * Δt
+    EX = probs.sum(axis=1) * delta
+    # E[X^2] ≈ sum_k 2 * t_k * S(t_k) * Δt
+    EX2 = (2*(probs*thresholds.values())).sum(axis=1) * delta
+    #Var(X)=E[X^22]−(E[X])^2
+    var = EX2 - EX ** 2
+    #Clip to avoid floating point error leading to negative number sqrt
+    var = np.clip(var,0,None)
+    df['implied_volatility'] = np.sqrt(var)
+    return df
 
     
 
@@ -102,7 +123,7 @@ def calculate_expected_cpi(thresholds:dict,df:pd.DataFrame)-> pd.DataFrame:
 #date, market, headline data
 #TODO:
 def join_kalshi_data():
-    kalshi_df = pd.DataFrame()
+    kalshi_dfs = []
     months = ['jan','feb','mar','apr','may','jun','jul','aug','sep''oct','nov']
     markets = ['cpi','cpicore','cpiyoy']
     for market in markets:
@@ -112,7 +133,7 @@ def join_kalshi_data():
             columns = list(df.columns)
             thresholds = extract_thresholds(columns)
             df = calculate_expected_cpi(thresholds,df)
-            #TODO: Calculate daily CPI volatility (std = implied vol)
+            df = calculate_implied_volatility(thresholds,df)
             #TODO: Calculate rolling prob volatility (std) for each threshold
             #TODO: Calculate rolling total change for each threshold
             #TODO: Calculate slope features (slope_01 = P>0.0 - P>0.1, etc.)
