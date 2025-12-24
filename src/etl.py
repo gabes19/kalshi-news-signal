@@ -94,11 +94,12 @@ def calculate_expected_cpi(thresholds:dict,df:pd.DataFrame)-> pd.DataFrame:
     df['expected_cpi'] = (probs * deltas_full).sum(axis = 1)
     return df
 
-#TODO: Test this function
-#Calculates and adds imolied volatility to dataframe
+#TODO: Test this function, Reconsider CPI YOY vs CPI
+#Calculates and adds implied volatility to dataframe
 def calculate_implied_volatility(thresholds:dict, df:pd.DataFrame) -> pd.DataFrame:
-    prob_cols = list(thresholds.keys())
+    prob_cols = [c for c in thresholds if thresholds[c] >= 0.0]
     probs = df[prob_cols].to_numpy() / 100.0
+    th_vals = [v for v in thresholds.values() if v >= 0.0]
     #assume equal deltas
     deltas = np.diff(list(thresholds.values()))
     if len(deltas) == 0:
@@ -107,14 +108,21 @@ def calculate_implied_volatility(thresholds:dict, df:pd.DataFrame) -> pd.DataFra
     delta = deltas[0]
     #E[X] ≈ sum_k S(t_k) * Δt
     EX = probs.sum(axis=1) * delta
+    print(f'EX = {EX}')
     # E[X^2] ≈ sum_k 2 * t_k * S(t_k) * Δt
-    EX2 = (2*(probs*thresholds.values())).sum(axis=1) * delta
-    #Var(X)=E[X^22]−(E[X])^2
-    var = EX2 - EX ** 2
+    EX2 = (2 * (probs * th_vals)).sum(axis=1) * delta
+    print(f'EX2 = {EX2}')
+    #Var(X)=E[X^2]−(E[X])^2
+    var = EX2 - (EX ** 2)
+    print(var)
     #Clip to avoid floating point error leading to negative number sqrt
     var = np.clip(var,0,None)
     df['implied_volatility'] = np.sqrt(var)
     return df
+
+def calculate_rolling_volatility(thresholds:dict, df:pd.DataFrame) -> pd.DataFrame:
+    pass
+
 
     
 
@@ -141,6 +149,7 @@ def join_kalshi_data():
             #TODO: Calculate spread between thresholds
             df = df.rename(columns={'timestamp':'date'})
 
-print(calculate_expected_cpi(extract_thresholds(test_cols),test_df))
+#print(calculate_expected_cpi(extract_thresholds(test_cols),test_df))
+print(calculate_implied_volatility(extract_thresholds(test_cols),test_df))
 #print(extract_thresholds(test_cols))
 #aggregate_daily_headlines('data/headlines/daily_headlines.csv')
