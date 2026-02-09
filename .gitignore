@@ -1,6 +1,10 @@
 # Data
 *.csv
 
+#AI
+codex.md
+.github
+
 # OS / Editor
 .DS_Store
 Thumbs.db
