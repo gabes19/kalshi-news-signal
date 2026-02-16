@@ -328,3 +328,6 @@ def join_kalshi_data(
     Path(output_file).parent.mkdir(parents=True, exist_ok=True)
     joined.to_csv(output_file, index=False)
     return joined
+
+
+join_kalshi_data()
