@@ -330,4 +330,4 @@ def join_kalshi_data(
     return joined
 
 
-join_kalshi_data()
+join_kalshi_data().to_csv('joined_data.csv', index= False)
