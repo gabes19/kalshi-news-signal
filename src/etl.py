@@ -99,6 +99,59 @@ def _get_probability_columns(df: pd.DataFrame, thresholds: dict[str, float]) -> 
     return [col for col, _ in ordered if col in df.columns]
 
 
+def create_bucket_probability_df(
+    thresholds: dict[str, float],
+    df: pd.DataFrame,
+    source_col: str = 'timestamp',
+) -> pd.DataFrame:
+    ordered = [(col, t) for col, t in _ordered_threshold_items(thresholds) if col in df.columns]
+    bucket_df = pd.DataFrame(index=df.index)
+
+    if source_col in df.columns:
+        bucket_df[source_col] = df[source_col]
+
+    if not ordered:
+        bucket_df['bucket_total_probability'] = 0.0
+        return bucket_df
+
+    prob_cols = [col for col, _ in ordered]
+    surv = (
+        df[prob_cols]
+        .apply(pd.to_numeric, errors='coerce')
+        .fillna(0)
+        .clip(lower=0, upper=100)
+        / 100.0
+    )
+
+    # Kalshi "Above x%" columns are cumulative probabilities and should be non-increasing.
+    # Enforce monotonicity to avoid negative bucket mass from noisy quotes.
+    surv_vals = np.minimum.accumulate(surv.to_numpy(), axis=1)
+    surv = pd.DataFrame(surv_vals, index=surv.index, columns=surv.columns)
+
+    bucket_cols: list[str] = []
+
+    first_col = prob_cols[0]
+    left_col_name = f"bucket_le_{_sanitize_column_name(first_col)}"
+    bucket_df[left_col_name] = (1.0 - surv[first_col]).clip(lower=0, upper=1)
+    bucket_cols.append(left_col_name)
+
+    for left_col, right_col in zip(prob_cols[:-1], prob_cols[1:]):
+        bucket_col = (
+            f"bucket_{_sanitize_column_name(left_col)}"
+            f"_to_{_sanitize_column_name(right_col)}"
+        )
+        bucket_df[bucket_col] = (surv[left_col] - surv[right_col]).clip(lower=0, upper=1)
+        bucket_cols.append(bucket_col)
+
+    last_col = prob_cols[-1]
+    right_col_name = f"bucket_gt_{_sanitize_column_name(last_col)}"
+    bucket_df[right_col_name] = surv[last_col].clip(lower=0, upper=1)
+    bucket_cols.append(right_col_name)
+
+    bucket_df['bucket_total_probability'] = bucket_df[bucket_cols].sum(axis=1)
+    return bucket_df
+
+
 # Calculates and adds expected cpi column to dataframe
 def calculate_expected_cpi(thresholds: dict, df: pd.DataFrame) -> pd.DataFrame:
     prob_cols = _get_probability_columns(df, thresholds)

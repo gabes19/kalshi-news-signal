@@ -154,3 +154,49 @@ def test_join_kalshi_data_writes_csv(tmp_path):
     assert "cpi_expected_cpi" in joined.columns
     assert "cpi_core_expected_cpi" in joined.columns
     assert "cpi_yoy_expected_cpi" in joined.columns
+
+
+def test_create_bucket_probability_df_builds_expected_buckets():
+    df = _build_test_df()
+    thresholds = etl.extract_thresholds(df.columns.tolist())
+
+    bucket_df = etl.create_bucket_probability_df(thresholds, df.copy())
+
+    assert 'timestamp' in bucket_df.columns
+    assert bucket_df['bucket_le_above_0_1'].iloc[0] == pytest.approx(0.01)
+    assert bucket_df['bucket_above_0_1_to_above_0_0'].iloc[0] == pytest.approx(0.02)
+    assert bucket_df['bucket_above_0_0_to_above_0_1'].iloc[0] == pytest.approx(0.09)
+    assert bucket_df['bucket_above_0_4_to_above_0_5'].iloc[0] == pytest.approx(0.08)
+    assert bucket_df['bucket_gt_above_0_5'].iloc[0] == pytest.approx(0.03)
+    assert bucket_df['bucket_total_probability'].iloc[0] == pytest.approx(1.0)
+
+
+def test_create_bucket_probability_df_handles_no_probability_columns():
+    df = pd.DataFrame([
+        {'timestamp': '2025-01-01T00:00:00Z', 'value': 1},
+        {'timestamp': '2025-01-02T00:00:00Z', 'value': 2},
+    ])
+
+    bucket_df = etl.create_bucket_probability_df({}, df)
+
+    assert 'timestamp' in bucket_df.columns
+    assert 'bucket_total_probability' in bucket_df.columns
+    assert bucket_df['bucket_total_probability'].tolist() == pytest.approx([0.0, 0.0])
+
+
+def test_create_bucket_probability_df_enforces_monotonic_cumulative_probs():
+    df = pd.DataFrame([
+        {
+            'timestamp': '2025-01-01T00:00:00Z',
+            'Above 0.0%': 70.0,
+            'Above 0.1%': 80.0,
+            'Above 0.2%': 50.0,
+        }
+    ])
+    thresholds = etl.extract_thresholds(df.columns.tolist())
+
+    bucket_df = etl.create_bucket_probability_df(thresholds, df)
+    bucket_cols = [c for c in bucket_df.columns if c.startswith('bucket_') and c != 'bucket_total_probability']
+
+    assert (bucket_df[bucket_cols] >= 0).all().all()
+    assert bucket_df['bucket_total_probability'].iloc[0] == pytest.approx(1.0)
