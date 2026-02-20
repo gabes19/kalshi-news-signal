@@ -2,6 +2,7 @@ import pandas as pd
 import pytest
 
 from src import etl
+from src import bucket_etl
 
 
 def _build_test_df() -> pd.DataFrame:
@@ -160,7 +161,7 @@ def test_create_bucket_probability_df_builds_expected_buckets():
     df = _build_test_df()
     thresholds = etl.extract_thresholds(df.columns.tolist())
 
-    bucket_df = etl.create_bucket_probability_df(thresholds, df.copy())
+    bucket_df = bucket_etl.create_bucket_probability_df(thresholds, df.copy())
 
     assert 'timestamp' in bucket_df.columns
     assert bucket_df['bucket_le_above_0_1'].iloc[0] == pytest.approx(0.01)
@@ -177,7 +178,7 @@ def test_create_bucket_probability_df_handles_no_probability_columns():
         {'timestamp': '2025-01-02T00:00:00Z', 'value': 2},
     ])
 
-    bucket_df = etl.create_bucket_probability_df({}, df)
+    bucket_df = bucket_etl.create_bucket_probability_df({}, df)
 
     assert 'timestamp' in bucket_df.columns
     assert 'bucket_total_probability' in bucket_df.columns
@@ -195,8 +196,65 @@ def test_create_bucket_probability_df_enforces_monotonic_cumulative_probs():
     ])
     thresholds = etl.extract_thresholds(df.columns.tolist())
 
-    bucket_df = etl.create_bucket_probability_df(thresholds, df)
+    bucket_df = bucket_etl.create_bucket_probability_df(thresholds, df)
     bucket_cols = [c for c in bucket_df.columns if c.startswith('bucket_') and c != 'bucket_total_probability']
 
     assert (bucket_df[bucket_cols] >= 0).all().all()
     assert bucket_df['bucket_total_probability'].iloc[0] == pytest.approx(1.0)
+
+
+def test_join_bucket_kalshi_data_writes_csv(tmp_path):
+    for market in ["cpi", "cpi_core", "cpi_yoy"]:
+        (tmp_path / market).mkdir(parents=True, exist_ok=True)
+
+    cpi_df = _build_test_df()
+    cpi_core_df = cpi_df.drop(columns=["Above -0.1%"])
+    cpi_yoy_df = pd.DataFrame([
+        {
+            "timestamp": "2025-04-01T00:00:00Z",
+            "Above 2.0%": 80.0,
+            "Above 2.1%": 70.0,
+            "Above 2.2%": 60.0,
+            "Above 2.3%": 50.0,
+            "Above 2.4%": 40.0,
+        },
+        {
+            "timestamp": "2025-04-02T00:00:00Z",
+            "Above 2.0%": 82.0,
+            "Above 2.1%": 71.0,
+            "Above 2.2%": 59.0,
+            "Above 2.3%": 49.0,
+            "Above 2.4%": 39.0,
+        },
+    ])
+
+    cpi_df.to_csv(tmp_path / "cpi" / "kalshi-price-history-kxcpi-25apr-day.csv", index=False)
+    cpi_core_df.to_csv(tmp_path / "cpi_core" / "kalshi-price-history-kxcpicore-25apr-day.csv", index=False)
+    cpi_yoy_df.to_csv(tmp_path / "cpi_yoy" / "kalshi-price-history-kxcpiyoy-25apr-day.csv", index=False)
+
+    headlines = pd.DataFrame([
+        {"date": "2025-04-01", "headline_count": 10, "mean_sentiment": 0.5},
+        {"date": "2025-04-02", "headline_count": 11, "mean_sentiment": 0.6},
+    ])
+    headlines_file = tmp_path / "daily_headlines.csv"
+    headlines.to_csv(headlines_file, index=False)
+
+    output_file = tmp_path / "joined_bucket.csv"
+    joined = bucket_etl.join_bucket_kalshi_data(
+        output_file=str(output_file),
+        headlines_file=str(headlines_file),
+        market_dirs={
+            "cpi": str(tmp_path / "cpi"),
+            "cpi_core": str(tmp_path / "cpi_core"),
+            "cpi_yoy": str(tmp_path / "cpi_yoy"),
+        },
+    )
+
+    assert output_file.exists()
+    assert "headline_count" in joined.columns
+    assert "cpi_expected_cpi" in joined.columns
+    assert "cpi_core_expected_cpi" in joined.columns
+    assert "cpi_yoy_expected_cpi" in joined.columns
+    assert "cpi_bucket_total_probability" in joined.columns
+    assert "cpi_core_bucket_total_probability" in joined.columns
+    assert "cpi_yoy_bucket_total_probability" in joined.columns
