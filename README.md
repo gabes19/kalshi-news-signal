@@ -5,7 +5,7 @@ Just a side project exploring a curiousity.
 Data from GNews API and Kalshi.
 
 ## Significant Findings
-There's much more to explore, and the data quality isn't the best, but here are some of my quick findings.
+There's much more to explore, and the data quality isn't the best, but here's a short list of some of my findings.
 - Headline count has the strongest relationship with CPI YoY implied volatility (positive, modest strength).
 - Headline spikes and volatility spikes rarely happen on the exact same day; overlap is limited.
 - Core CPI implied volatility shows a weak negative relationship with headline volume in this sample.
